@@ -12,6 +12,7 @@ use fallible_iterator::FallibleIterator;
 use fatality::Split as _;
 use futures::TryFutureExt as _;
 use hashlink::LinkedHashSet;
+use tokio::sync::watch::{self, Sender as WatchSender};
 
 use crate::{
     messages::{
@@ -914,24 +915,23 @@ where
 pub(in crate::validator) async fn sync_to_tip<MainClient>(
     dbs: &Dbs,
     event_tx: &Sender<Event>,
-    header_sync_progress_channel: &Option<(
-        tokio::sync::watch::Sender<HeaderSyncProgress>,
-        tokio::sync::watch::Receiver<HeaderSyncProgress>,
-    )>,
+    header_sync_progress_channel: &Option<WatchSender<HeaderSyncProgress>>,
     main_client: &MainClient,
     main_tip: BlockHash,
 ) -> Result<(), error::Sync>
 where
     MainClient: bip300301::client::MainClient + Sync,
 {
-    let Some((tx, _)) = header_sync_progress_channel else {
+    if header_sync_progress_channel.is_none() {
         return Err(error::Sync::HeaderSyncInProgress(HeaderSyncInProgressError));
-    };
+    }
+
+    let progress_sender = header_sync_progress_channel.as_ref().unwrap();
 
     // Do sync work
     async {
-        sync_headers(dbs, main_client, main_tip, tx).await?;
-        sync_blocks(dbs, event_tx, main_client, main_tip, tx).await
+        sync_headers(dbs, main_client, main_tip, progress_sender).await?;
+        sync_blocks(dbs, event_tx, main_client, main_tip, progress_sender).await
     }
     .await
 }

@@ -195,10 +195,7 @@ pub struct Validator {
     dbs: Dbs,
     events_rx: InactiveReceiver<Event>,
     events_tx: BroadcastSender<Event>,
-    header_sync_progress_channel: Option<(
-        WatchSender<HeaderSyncProgress>,
-        watch::Receiver<HeaderSyncProgress>,
-    )>,
+    header_sync_progress_channel: Option<WatchSender<HeaderSyncProgress>>,
     mainchain_client: jsonrpsee::http_client::HttpClient,
     network: bitcoin::Network,
 }
@@ -242,8 +239,8 @@ impl Validator {
         .fuse()
     }
 
-    pub fn subscribe_header_sync_progress(&self) -> Option<&watch::Receiver<HeaderSyncProgress>> {
-        self.header_sync_progress_channel.as_ref().map(|(_, rx)| rx)
+    pub fn subscribe_header_sync_progress(&self) -> Option<watch::Receiver<HeaderSyncProgress>> {
+        self.header_sync_progress_channel.as_ref().map(|tx| tx.subscribe())
     }
 
     /// Get (possibly unactivated) sidechains
