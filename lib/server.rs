@@ -168,8 +168,11 @@ impl ValidatorService for Validator {
         &self,
         _request: tonic::Request<SubscribeHeaderSyncRequest>,
     ) -> Result<tonic::Response<Self::SubscribeHeaderSyncProgressStream>, tonic::Status> {
-        let rx = self.subscribe_header_sync_progress();
+        let Some(rx) = self.subscribe_header_sync_progress() else {
+            return Err(tonic::Status::unavailable("No header sync in progress"));
+        };
         let initial = rx.borrow().clone();
+        let rx = rx.clone();
         let stream = futures::stream::once(async { Ok(initial.into()) })
             .chain(futures::stream::try_unfold(rx, |mut rx| async move {
                 match rx.changed().await {

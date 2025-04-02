@@ -216,18 +216,12 @@ impl Validator {
         events_rx.set_await_active(false);
         events_rx.set_overflow(true);
 
-        // Initialize header sync channel
-        let (header_sync_progress_tx, header_sync_progress_rx) = watch::channel(HeaderSyncProgress {
-            current_height: 0,
-            target_height: 0,
-        });
-
         let dbs = Dbs::new(data_dir, network)?;
         Ok(Self {
             dbs,
             events_rx: events_rx.deactivate(),
             events_tx,
-            header_sync_progress_channel: Some((header_sync_progress_tx, header_sync_progress_rx)),
+            header_sync_progress_channel: None,
             mainchain_client,
             network,
         })
@@ -248,18 +242,8 @@ impl Validator {
         .fuse()
     }
 
-    pub fn subscribe_header_sync_progress(&self) -> watch::Receiver<HeaderSyncProgress> {
-        match &self.header_sync_progress_channel {
-            Some((_, rx)) => rx.clone(),
-            None => {
-                // Return an empty receiver if no sync in progress
-                let (_, rx) = watch::channel(HeaderSyncProgress {
-                    current_height: 0,
-                    target_height: 0,
-                });
-                rx
-            }
-        }
+    pub fn subscribe_header_sync_progress(&self) -> Option<&watch::Receiver<HeaderSyncProgress>> {
+        self.header_sync_progress_channel.as_ref().map(|(_, rx)| rx)
     }
 
     /// Get (possibly unactivated) sidechains
